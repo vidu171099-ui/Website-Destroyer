@@ -833,6 +833,10 @@ function resetAll() {
   toolbar.classList.remove('dd-open');
   canvas.classList.remove('dd-active');
   updateCursorVisibility();
+  window.parent.postMessage({ ddActive: false }, '*');
+  // Return focus to parent so Framer scroll works again
+  window.parent.focus();
+  document.activeElement.blur();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -866,6 +870,21 @@ document.querySelectorAll('.dd-tool-row').forEach(row => {
 //   TOGGLE
 // ═══════════════════════════════════════════════════════
 
+// Auto-activate when loaded inside an iframe (embedded in portfolio)
+if (window !== window.parent) {
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      unlockAudio();
+      _preloadAudio();
+      isActive = true;
+      toggle.classList.add('dd-on');
+      toolbar.classList.add('dd-open');
+      canvas.classList.add('dd-active');
+      updateCursorVisibility();
+    }, 300);
+  });
+}
+
 toggle.addEventListener('click', () => {
   unlockAudio();
   _preloadAudio();
@@ -874,6 +893,7 @@ toggle.addEventListener('click', () => {
   toolbar.classList.toggle('dd-open', isActive);
   canvas.classList.toggle('dd-active', isActive);
   updateCursorVisibility();
+  window.parent.postMessage({ ddActive: isActive }, '*');
   if (!isActive) {
     stopSaw();
     drawing = false;
