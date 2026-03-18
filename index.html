@@ -88,9 +88,17 @@ body { background: transparent; }
   gap: 4px;
   background: #ffffff;
   border-radius: 14px;
-  padding: 8px 12px;
+  padding: 8px 13px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.15), 0 1px 0 rgba(0,0,0,0.06);
+  pointer-events: none;
+  opacity: 0.55;
+  filter: grayscale(1);
+  transition: opacity 0.4s ease, filter 0.4s ease;
+}
+#dd-toolbar.dd-open {
   pointer-events: all;
+  opacity: 1;
+  filter: grayscale(0);
 }
 
 .dd-tool-row {
@@ -141,8 +149,8 @@ body { background: transparent; }
 .dd-tool-row.dd-sel .dd-tool-label { color: #bbb; }
 
 .dd-tool-btn {
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   border: 1.5px solid rgba(0,0,0,0.10);
   border-radius: 12px;
   background: transparent;
@@ -304,9 +312,104 @@ body { background: transparent; }
   60%  { opacity: calc(var(--op) * 0.6); }
   100% { opacity: 0; transform: scale(0.05) translateX(var(--drift)) translateY(var(--rise)); }
 }
+
+/* ══════════════════════════════════
+   XP WALLPAPER BACKGROUND
+══════════════════════════════════ */
+body {
+  background-image: url('https://upload.wikimedia.org/wikipedia/en/5/5e/Windows_XP_SP3_Wallpapers_Bliss.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* ══════════════════════════════════
+   PROMPT SCREEN
+══════════════════════════════════ */
+#dd-prompt-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+#dd-prompt-screen.dd-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+}
+
+#dd-prompt-box {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 420px;
+  box-shadow: none;
+}
+
+#dd-prompt-label {
+  font-family: Arial, -apple-system, sans-serif;
+  font-size: 18px;
+  font-weight: 400;
+  color: #111;
+  letter-spacing: -0.01em;
+  text-align: left;
+  width: 100%;
+}
+
+#dd-prompt-input {
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 12px;
+  font-family: Arial, -apple-system, sans-serif;
+  font-size: 15px;
+  color: #111;
+  background: rgba(0,0,0,0.06);
+  outline: none;
+  text-align: left;
+  transition: background 0.2s;
+}
+#dd-prompt-input:focus {
+  background: rgba(0,0,0,0.08);
+}
+#dd-prompt-input::placeholder {
+  color: #aaa;
+}
+
+#dd-prompt-submit {
+  display: none;
+}
+
+#dd-prompt-note {
+  font-family: Arial, -apple-system, sans-serif;
+  font-size: 11px;
+  color: rgba(0,0,0,0.35);
+  letter-spacing: 0.01em;
+  width: 100%;
+  text-align: left;
+  margin-top: 2px;
+}
 </style>
 </head>
 <body>
+
+<!-- PROMPT SCREEN -->
+<div id="dd-prompt-screen">
+  <div id="dd-prompt-box">
+    <p id="dd-prompt-label">What made you mad today?</p>
+    <input id="dd-prompt-input" type="text" placeholder="Type and press enter" maxlength="60" autocomplete="off" />
+    <p id="dd-prompt-note">This data is not stored.</p>
+    <button id="dd-prompt-submit">unleash</button>
+  </div>
+</div>
 
 <!-- DESTROYER SYSTEM -->
 <canvas id="dd-canvas"></canvas>
@@ -843,10 +946,22 @@ function stopSpray() {
 function resetAll() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   fxLayer.innerHTML = '';
-  // Deactivate canvas but keep toolbar visible
+  // Deactivate canvas and hide toolbar
   isActive = false;
   canvas.classList.remove('dd-active');
+  toolbar.classList.remove('dd-open');
   updateCursorVisibility();
+  // Remove rage text if present
+  const rageEl = document.getElementById('dd-rage-text');
+  if (rageEl) rageEl.remove();
+  // Show prompt screen again
+  const ps = document.getElementById('dd-prompt-screen');
+  if (ps) {
+    ps.style.display = 'flex';
+    ps.classList.remove('dd-hidden');
+    document.getElementById('dd-prompt-input').value = '';
+    document.getElementById('dd-prompt-input').focus();
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -888,9 +1003,49 @@ document.querySelectorAll('.dd-tool-row').forEach(row => {
 //   TOGGLE
 // ═══════════════════════════════════════════════════════
 
-// Toolbar always open — tools visible immediately
-window.addEventListener('load', () => {
+// Prompt screen logic
+const promptScreen = document.getElementById('dd-prompt-screen');
+const promptInput  = document.getElementById('dd-prompt-input');
+const promptSubmit = document.getElementById('dd-prompt-submit');
+
+function activateDestroyer() {
+  const userText = promptInput.value.trim() || 'everything';
+  // Fade out the prompt box
+  promptScreen.classList.add('dd-hidden');
+  setTimeout(() => { promptScreen.style.display = 'none'; }, 500);
+  // Show the user's text in the centre of the page
+  const textEl = document.createElement('div');
+  textEl.id = 'dd-rage-text';
+  textEl.textContent = userText;
+  textEl.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: Arial, -apple-system, sans-serif;
+    font-size: clamp(28px, 5vw, 56px);
+    font-weight: 700;
+    color: #111;
+    z-index: 100;
+    pointer-events: none;
+    text-align: center;
+    letter-spacing: -0.02em;
+    opacity: 0;
+    transition: opacity 0.4s ease 0.3s;
+  `;
+  document.body.appendChild(textEl);
+  requestAnimationFrame(() => { textEl.style.opacity = '1'; });
   toolbar.classList.add('dd-open');
+}
+
+promptSubmit.addEventListener('click', activateDestroyer);
+promptInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') activateDestroyer();
+});
+
+// Focus input on load
+window.addEventListener('load', () => {
+  promptInput.focus();
 });
 
 toggle.addEventListener('click', () => {
